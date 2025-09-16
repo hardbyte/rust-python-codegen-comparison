@@ -1,196 +1,149 @@
-# Rust-Python Interop Demo
+# Rust ↔ Python Codegen Demo
 
-This project demonstrates seamless interoperability between Rust and Python using OpenAPI code generation. It showcases two different approaches:
+This repository compares two approaches for delivering the same API surface from Rust to Python:
 
-1. **utoipa** - Direct OpenAPI generation with Swagger UI
-2. **reflectapi** - Code-first API definition with multi-language client generation
+- **`shared_models/`** – a lightweight crate that defines all DTOs/enums once and conditionally derives `utoipa` and `reflectapi` traits so each server emits the same schema.
+- **`axum_server/`** – an Axum application annotated with [`utoipa`](https://docs.rs/utoipa) that exposes REST endpoints and an OpenAPI document at runtime.
+- **`reflect_server/`** – a code-first [`reflectapi`](https://crates.io/crates/reflectapi) service that builds an identical schema and streams the specification as both Reflect JSON and OpenAPI.
+- **Generated clients** – `axum-server-client/` and `reflect-api-demo-client/` are regenerated automatically by `./test-ci.sh` so that the Python examples always match the latest schema.
 
-Both Rust servers generate OpenAPI specifications that are used to automatically generate type-safe Python clients.
+By sharing the types the two servers emit byte-identical payloads while covering richer features: timestamps (`chrono::DateTime<Utc>`), enums, optional fields, and structured error payloads.
 
-## Project Structure
+## API Surface
+
+### REST API (Axum + utoipa)
+
+| Method | Path          | Description                     |
+|--------|---------------|---------------------------------|
+| GET    | `/health`     | Health check with timestamp     |
+| GET    | `/users`      | List all users                  |
+| GET    | `/users/{id}` | Fetch a single user by id       |
+| POST   | `/users`      | Create a user with validation   |
+
+All error responses use `{ "code": string, "message": string, "detail"?: string }` and appropriate HTTP status codes.
+
+### RPC API (ReflectAPI)
+
+| Operation     | Route         | HTTP Methods | Notes                                      |
+|---------------|---------------|--------------|-------------------------------------------|
+| `health.get`  | `/health.get` | GET, POST    | Same payload as the REST `/health` route |
+| `users.list`  | `/users.list` | GET, POST    | Enumerates users                          |
+| `user.get`    | `/user.get`   | POST         | Accepts `{ "id": number }`               |
+| `user.create` | `/user.create`| POST         | Validates username/email/roles           |
+
+**HTTP Method Support:**
+- Operations without parameters (`health.get`, `users.list`): Support both GET and POST
+- Operations with parameters (`user.get`, `user.create`): POST only with JSON request body
+
+The generated OpenAPI document is normalized so that enums appear as standard `enum` values, keeping the Python generator happy.
+
+### Shared data types
+
+- `User`
+  - `id: u64`
+  - `username`, `email`
+  - `created_at: DateTime<Utc>`
+  - `roles: [admin|editor|viewer]`
+  - `status: [active|invited|suspended]`
+  - `preferences?: { theme, timezone?, last_login_at? }`
+- `HealthStatus`
+  - `status`
+  - `checked_at: DateTime<Utc>`
+  - `region?`
+- `ApiError`
+  - `code`, `message`, `detail?`
+- `CreateUserRequest`
+  - `username`, `email`
+  - `roles?`, `timezone?`
+
+These types are reused verbatim in both the utoipa and reflectapi servers.
+
+## End-to-End Workflow
+
+1. **Install prerequisites**
+   - Rust (stable channel)
+   - Python 3.12+
+   - [`uv`](https://github.com/astral-sh/uv)
+
+2. **Run the local CI harness**
+   ```bash
+   ./test-ci.sh
+   ```
+   The script:
+   - Runs `cargo fmt` + `cargo clippy`
+   - Builds both servers in release mode
+   - Boots the binaries and waits for readiness
+   - Downloads and normalizes the OpenAPI specs
+   - Regenerates the Python clients with `openapi-python-client`
+   - Runs the Python examples and test suite to verify functionality
+
+3. **Start servers manually**
+   ```bash
+   # Start Axum/utoipa server (port 8000)
+   cargo run --release --bin axum_server
+
+   # Start ReflectAPI server (port 9000)
+   cargo run --release --bin reflect_server
+   ```
+
+4. **Generate Python clients manually**
+   ```bash
+   # Generate client for Axum REST API
+   uv run openapi-python-client generate --url http://127.0.0.1:8000/api-docs/openapi.json --meta uv --overwrite
+
+   # Generate client for ReflectAPI Server (using git version with Python support)
+   cargo install --git https://github.com/thepartly/reflectapi reflectapi-cli
+   reflectapi codegen --language python --schema reflect_server/reflectapi.json \
+     --output reflect-api-demo-client/reflect_api_demo_client \
+     --python-package-name "reflect_api_demo_client" --python-async
+   ```
+
+5. **Initialize the uv workspace and run Python demos**
+   ```bash
+   # Sync workspace dependencies (creates proper local package links)
+   uv sync
+
+   # Run simple examples
+   uv run python axum_example.py      # REST API simple example
+   uv run python reflect_example.py   # RPC API simple example
+
+   # Run interactive TUI demo for presentations
+   uv run python demo_tui.py          # Manual control (default)
+   uv run python demo_tui.py --auto   # Auto-advance mode
+
+   # Run test suite
+   uv run pytest test_apis.py -v
+   ```
+
+The `test-ci.sh` pipeline mirrors the `.github/workflows/ci.yml` job so GitHub Actions and local development stay in sync.
+
+## Repository Layout
 
 ```
-├── rust_server/               # Rust HTTP server with utoipa
-│   ├── src/
-│   │   ├── main.rs           # Main server with utoipa annotations
-│   │   └── models.rs         # Data models with OpenAPI schemas
-│   └── Cargo.toml            # Rust dependencies
-├── reflect_server/           # Rust HTTP server with reflectapi
-│   ├── src/
-│   │   ├── main.rs           # Main server entry point
-│   │   └── lib.rs            # API definition with reflectapi
-│   └── Cargo.toml            # Rust dependencies with reflectapi
-├── my_client/                # Generated Python client for utoipa server
-├── reflect_api_demo_client/  # Generated Python client for reflectapi server
-├── main.py                   # Python client usage example (utoipa)
-├── reflect_main.py           # Python client usage example (reflectapi)
-├── api.json                  # Downloaded OpenAPI spec (utoipa)
-├── reflectapi_spec.json      # Downloaded OpenAPI spec (reflectapi)
-└── .venv/                    # Python virtual environment
+├── shared_models/               # Reusable Rust crate with DTOs/enums
+├── axum_server/                 # Axum + utoipa server (REST API)
+│   └── src/
+│       └── main.rs              # Routes, handlers, OpenAPI doc
+├── reflect_server/              # reflectapi builder + Axum host (RPC API)
+│   └── src/
+│       ├── lib.rs               # Builder using shared models with tags
+│       └── main.rs              # Spec export + Axum bridge
+├── axum-server-client/          # Generated OpenAPI client for REST server (workspace member)
+│   └── pyproject.toml           # Modern pyproject.toml for uv
+├── reflect-api-demo-client/     # Generated OpenAPI client for RPC server (workspace member)
+│   └── pyproject.toml           # Modern pyproject.toml for uv
+├── axum_example.py              # Simple example client for REST API
+├── reflect_example.py           # Simple example client for RPC API
+├── demo_tui.py                  # Interactive TUI demo for presentations
+├── test_apis.py                 # Pytest test suite for both APIs
+├── pyproject.toml               # uv workspace root with local dependencies
+├── test-ci.sh                   # Local CI + codegen harness
+└── .github/workflows/ci.yml     # GitHub Actions workflow that runs the same script
 ```
 
-## Features
+## Notes
 
-### utoipa Server (Port 8000)
-- **Simple Setup**: Attribute-based OpenAPI generation
-- **Swagger UI**: Interactive documentation at `/swagger-ui`
-- **Direct HTTP**: Traditional REST API with JSON responses
-- **Minimal Dependencies**: Just utoipa + axum
-
-### reflectapi Server (Port 9000)
-- **Code-First**: Define API through Rust functions
-- **Rich Type System**: Support for complex Rust types
-- **Multi-Language**: Generate clients in TypeScript, Rust, Python
-- **Advanced Features**: Error handling, validation, state management
-
-## Getting Started
-
-### Prerequisites
-
-- Rust (latest stable)
-- Python 3.12+
-- uv (Python package manager)
-
-### 1. Run Both Rust Servers
-
-**Start the utoipa server (port 8000):**
-```bash
-cd rust_server
-cargo run
-```
-
-**Start the reflectapi server (port 9000):**
-```bash
-cd reflect_server
-cargo run
-```
-
-Servers will be available at:
-- utoipa: `http://127.0.0.1:8000` with Swagger UI at `/swagger-ui`
-- reflectapi: `http://127.0.0.1:9000` with Swagger UI at `/swagger-ui`
-
-### 2. Generate Python Clients
-
-**Setup Python environment:**
-```bash
-uv venv
-source .venv/bin/activate
-uv pip install openapi-python-client
-```
-
-**Generate utoipa client:**
-```bash
-curl http://127.0.0.1:8000/api-docs/openapi.json -o api.json
-openapi-python-client generate --path api.json --output-path ./my_client
-uv pip install ./my_client/
-```
-
-**Generate reflectapi client:**
-```bash
-curl http://127.0.0.1:9000/openapi.json -o reflectapi_spec.json
-openapi-python-client generate --path reflectapi_spec.json --output-path ./reflect_client
-uv pip install ./reflect_client/
-```
-
-### 3. Use the Python Clients
-
-**Test utoipa client:**
-```bash
-python main.py
-```
-
-**Test reflectapi client:**
-```bash
-python reflect_main.py
-```
-
-## API Comparison
-
-### utoipa Server Features
-- Simple user model with id, username
-- Single GET endpoint: `/user`
-- Minimal setup, fast iteration
-
-### reflectapi Server Features
-- Rich user model with id, username, email, active status
-- Multiple endpoints:
-  - `message.get` - Get a simple message
-  - `users.list` - List all users
-  - `user.create` - Create new users with validation
-- State management with in-memory storage
-- Error handling with typed errors
-
-## Example Usage
-
-### utoipa Client
-```python
-from my_client.rust_server_client import Client
-from my_client.rust_server_client.api.crate import get_user
-
-client = Client(base_url="http://127.0.0.1:8000")
-user_response = await get_user.asyncio_detailed(client=client)
-user = user_response.parsed
-print(f"User: {user.username} (ID: {user.id})")
-```
-
-### reflectapi Client
-```python
-from reflect_api_demo_client import Client
-from reflect_api_demo_client.api.default import users_list, user_create
-from reflect_api_demo_client.models import reflect_server_proto_create_user_request
-
-client = Client(base_url="http://127.0.0.1:9000")
-
-# List users
-users_response = await users_list.asyncio_detailed(client=client)
-users = users_response.parsed
-
-# Create user
-create_request = reflect_server_proto_create_user_request.ReflectServerProtoCreateUserRequest(
-    username="newuser",
-    email="newuser@example.com"
-)
-create_response = await user_create.asyncio_detailed(client=client, body=create_request)
-```
-
-## Key Benefits
-
-1. **Type Safety**: Changes to Rust models automatically propagate to Python
-2. **Code Generation**: No manual client writing required
-3. **IDE Support**: Full autocompletion and type checking in Python
-4. **Documentation**: Automatic API documentation via Swagger UI
-5. **Validation**: Client-side validation based on OpenAPI schema
-6. **Multiple Approaches**: Choose between simple (utoipa) or feature-rich (reflectapi)
-
-## Development Workflow
-
-### For utoipa:
-1. Modify Rust models or API endpoints with utoipa annotations
-2. Restart the Rust server
-3. Re-download the OpenAPI spec from `/api-docs/openapi.json`
-4. Regenerate the Python client
-5. Python code automatically benefits from type updates
-
-### For reflectapi:
-1. Modify Rust API definitions in the builder
-2. Restart the Rust server
-3. Re-download the OpenAPI spec from `/openapi.json`
-4. Regenerate the Python client
-5. Python code automatically benefits from type updates
-
-This approach ensures that breaking changes in the API are caught at compile/type-check time rather than runtime.
-
-## When to Use Which
-
-**Choose utoipa when:**
-- Building simple REST APIs
-- Want minimal setup overhead
-- Need quick prototyping
-- Working with existing axum applications
-
-**Choose reflectapi when:**
-- Building complex APIs with rich types
-- Need multi-language client generation
-- Want code-first API design
-- Need advanced error handling and validation
-- Working with complex Rust type systems
+- Both servers emit Swagger/Redoc UIs (`http://127.0.0.1:8000/swagger-ui`, `http://127.0.0.1:9000/doc`).
+- The reflectapi server writes `reflect_server/reflectapi.json` on startup; `test-ci.sh` waits for the file before generating clients.
+- Enums, timestamps, optional fields, and structured errors are now first-class in both ecosystems, so the generated Python clients expose type-safe enums and `datetime` values.
+- If you tweak the schema, rerun `./test-ci.sh` to refresh the Python clients and validate the system end-to-end.

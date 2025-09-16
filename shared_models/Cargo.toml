@@ -1,0 +1,17 @@
+[package]
+name = "shared_models"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = []
+utoipa = ["dep:utoipa"]
+reflectapi = ["dep:reflectapi", "dep:http"]
+full = ["utoipa", "reflectapi"]
+
+[dependencies]
+serde.workspace = true
+chrono = { version = "0.4", features = ["serde", "clock"] }
+utoipa = { version = "4.2", features = ["chrono"], optional = true }
+reflectapi = { version = "0.15.7", features = ["chrono"], optional = true }
+http = { version = "1.2.0", optional = true }

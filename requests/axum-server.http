@@ -1,0 +1,15 @@
+
+### Health check
+GET http://localhost:8000/health
+Accept: application/json
+
+
+### List users
+GET http://localhost:8000/users
+Accept: application/json
+
+
+### Get a user by ID
+GET http://localhost:8000/users/1
+Accept: application/json
+

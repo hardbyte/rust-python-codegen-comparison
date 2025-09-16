@@ -1,17 +1,20 @@
 [package]
 name = "reflect_server"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-reflectapi = { path = "/home/brian/dev/reflectapi/reflectapi", features = [
+reflectapi = { version = "0.15.7", features = [
     "builder",
     "axum",
     "codegen",
-    "json"
+    "json",
+    "chrono"
 ] }
-tokio = { version = "1.0", features = ["full"] }
-axum = "0.8.1"
+tokio.workspace = true
+axum = "0.8"  # reflectapi requires axum 0.8
 http = "1.2.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde.workspace = true
+serde_json.workspace = true
+shared_models = { path = "../shared_models", features = ["reflectapi"] }
+chrono = { version = "0.4", features = ["serde", "clock"] }

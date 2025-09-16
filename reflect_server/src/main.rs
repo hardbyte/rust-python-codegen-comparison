@@ -1,5 +1,6 @@
-use std::error::Error;
-use axum::{response::Html, Json};
+use axum::{response::Html, routing, Json};
+use reflectapi::axum::into_router;
+use std::{error::Error, sync::Arc};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -15,46 +16,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
     .await?;
 
     // Start the server based on axum web framework
-    let app_state = Default::default();
-    let axum_app = reflectapi::into_router(app_state, routers, |_name, r| r)
+    let app_state = Arc::new(reflect_server::AppState::default());
+
+    // Use reflectapi routes directly
+    let axum_app = into_router(app_state.clone(), routers, |_name, r| r)
         .route(
             "/openapi.json",
-            axum::routing::get(|| async { Json(openapi_spec) }),
+            routing::get(|| async { Json(openapi_spec) }),
         )
         .route(
-            "/swagger-ui",
-            axum::routing::get(|| async {
-                Html(r#"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>API Documentation</title>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@3.25.0/swagger-ui.css" />
-</head>
-<body>
-    <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@3.25.0/swagger-ui-bundle.js"></script>
-    <script>
-        SwaggerUIBundle({
-            url: '/openapi.json',
-            dom_id: '#swagger-ui',
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIBundle.presets.standalone
-            ]
-        });
-    </script>
-</body>
-</html>
-                "#)
-            }),
+            "/doc",
+            routing::get(|| async { Html(include_str!("redoc.html")) }),
         );
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "9000".to_string());
     let bind_addr = format!("0.0.0.0:{}", port);
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
     eprintln!("ReflectAPI server listening on http://{}", bind_addr);
-    eprintln!("Swagger UI: http://{}/swagger-ui", bind_addr);
+    eprintln!("Documentation UI (redoc): http://{}/doc", bind_addr);
     axum::serve(listener, axum_app).await?;
 
     Ok(())

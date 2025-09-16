@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "axum_server",
+    "reflect_server",
+    "shared_models",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Demo Author"]
+
+[workspace.dependencies]
+# Note: axum_server uses axum 0.7 (for utoipa compatibility)
+# reflect_server uses axum 0.8 (for reflectapi compatibility)
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

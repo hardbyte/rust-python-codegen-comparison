@@ -1,0 +1,544 @@
+{
+  "name": "Reflect API Demo",
+  "description": "A unified API surface for comparing utoipa and reflectapi",
+  "functions": [
+    {
+      "name": "health.get",
+      "path": "",
+      "description": "Get server health metadata",
+      "output_type": {
+        "name": "shared_models::HealthStatus"
+      },
+      "serialization": [
+        "json"
+      ],
+      "readonly": true,
+      "tags": [
+        "health"
+      ]
+    },
+    {
+      "name": "users.list",
+      "path": "",
+      "description": "List all users with profile metadata",
+      "output_type": {
+        "name": "std::vec::Vec",
+        "arguments": [
+          {
+            "name": "shared_models::User"
+          }
+        ]
+      },
+      "serialization": [
+        "json"
+      ],
+      "readonly": true,
+      "tags": [
+        "users"
+      ]
+    },
+    {
+      "name": "user.get",
+      "path": "",
+      "description": "Fetch a single user by id",
+      "input_type": {
+        "name": "reflect_server::GetUserRequest"
+      },
+      "output_type": {
+        "name": "shared_models::User"
+      },
+      "error_type": {
+        "name": "shared_models::ApiError"
+      },
+      "serialization": [
+        "json"
+      ],
+      "tags": [
+        "users"
+      ]
+    },
+    {
+      "name": "user.create",
+      "path": "",
+      "description": "Create a new user with validation",
+      "input_type": {
+        "name": "shared_models::CreateUserRequest"
+      },
+      "output_type": {
+        "name": "shared_models::User"
+      },
+      "error_type": {
+        "name": "shared_models::ApiError"
+      },
+      "serialization": [
+        "json"
+      ],
+      "tags": [
+        "users"
+      ]
+    }
+  ],
+  "input_types": {
+    "types": [
+      {
+        "kind": "struct",
+        "name": "reflect_server::GetUserRequest",
+        "fields": {
+          "named": [
+            {
+              "name": "id",
+              "type": {
+                "name": "u64"
+              },
+              "required": true
+            }
+          ]
+        }
+      },
+      {
+        "kind": "struct",
+        "name": "reflectapi::Empty",
+        "description": "Struct object with no fields",
+        "fields": "none"
+      },
+      {
+        "kind": "struct",
+        "name": "shared_models::CreateUserRequest",
+        "fields": {
+          "named": [
+            {
+              "name": "username",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "email",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "roles",
+              "type": {
+                "name": "std::vec::Vec",
+                "arguments": [
+                  {
+                    "name": "shared_models::Role"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "timezone",
+              "type": {
+                "name": "std::option::Option",
+                "arguments": [
+                  {
+                    "name": "std::string::String"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "enum",
+        "name": "shared_models::Role",
+        "variants": [
+          {
+            "name": "admin",
+            "fields": "none"
+          },
+          {
+            "name": "editor",
+            "fields": "none"
+          },
+          {
+            "name": "viewer",
+            "fields": "none"
+          }
+        ]
+      },
+      {
+        "kind": "enum",
+        "name": "std::option::Option",
+        "description": "Optional nullable type",
+        "parameters": [
+          {
+            "name": "T"
+          }
+        ],
+        "representation": "none",
+        "variants": [
+          {
+            "name": "None",
+            "description": "The value is not provided, i.e. null",
+            "fields": "none"
+          },
+          {
+            "name": "Some",
+            "description": "The value is provided and set to some value",
+            "fields": {
+              "unnamed": [
+                {
+                  "name": "0",
+                  "type": {
+                    "name": "T"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "kind": "primitive",
+        "name": "std::string::String",
+        "description": "UTF-8 encoded string"
+      },
+      {
+        "kind": "primitive",
+        "name": "std::vec::Vec",
+        "description": "Expandable array type",
+        "parameters": [
+          {
+            "name": "T"
+          }
+        ]
+      },
+      {
+        "kind": "primitive",
+        "name": "u64",
+        "description": "64-bit unsigned integer"
+      }
+    ]
+  },
+  "output_types": {
+    "types": [
+      {
+        "kind": "primitive",
+        "name": "bool",
+        "description": "Boolean value"
+      },
+      {
+        "kind": "primitive",
+        "name": "chrono::DateTime",
+        "description": "DateTime at a given timezone (RFC3339 format)",
+        "parameters": [
+          {
+            "name": "Tz"
+          }
+        ],
+        "fallback": {
+          "name": "std::string::String"
+        }
+      },
+      {
+        "kind": "struct",
+        "name": "reflectapi::Infallible",
+        "description": "Error object which is expected to be never returned",
+        "fields": "none"
+      },
+      {
+        "kind": "enum",
+        "name": "shared_models::AccountStatus",
+        "variants": [
+          {
+            "name": "active",
+            "fields": "none"
+          },
+          {
+            "name": "invited",
+            "fields": "none"
+          },
+          {
+            "name": "suspended",
+            "fields": "none"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "shared_models::ApiError",
+        "fields": {
+          "named": [
+            {
+              "name": "code",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "message",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "detail",
+              "type": {
+                "name": "std::option::Option",
+                "arguments": [
+                  {
+                    "name": "std::string::String"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "struct",
+        "name": "shared_models::HealthStatus",
+        "fields": {
+          "named": [
+            {
+              "name": "status",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "checked_at",
+              "type": {
+                "name": "chrono::DateTime",
+                "arguments": [
+                  {
+                    "name": "chrono::Utc"
+                  }
+                ]
+              },
+              "required": true
+            },
+            {
+              "name": "region",
+              "type": {
+                "name": "std::option::Option",
+                "arguments": [
+                  {
+                    "name": "std::string::String"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "struct",
+        "name": "shared_models::Preferences",
+        "fields": {
+          "named": [
+            {
+              "name": "theme",
+              "type": {
+                "name": "shared_models::Theme"
+              },
+              "required": true
+            },
+            {
+              "name": "timezone",
+              "type": {
+                "name": "std::option::Option",
+                "arguments": [
+                  {
+                    "name": "std::string::String"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "last_login_at",
+              "type": {
+                "name": "std::option::Option",
+                "arguments": [
+                  {
+                    "name": "chrono::DateTime",
+                    "arguments": [
+                      {
+                        "name": "chrono::Utc"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "enum",
+        "name": "shared_models::Role",
+        "variants": [
+          {
+            "name": "admin",
+            "fields": "none"
+          },
+          {
+            "name": "editor",
+            "fields": "none"
+          },
+          {
+            "name": "viewer",
+            "fields": "none"
+          }
+        ]
+      },
+      {
+        "kind": "enum",
+        "name": "shared_models::Theme",
+        "variants": [
+          {
+            "name": "light",
+            "fields": "none"
+          },
+          {
+            "name": "dark",
+            "fields": "none"
+          },
+          {
+            "name": "system",
+            "fields": "none"
+          }
+        ]
+      },
+      {
+        "kind": "struct",
+        "name": "shared_models::User",
+        "fields": {
+          "named": [
+            {
+              "name": "id",
+              "type": {
+                "name": "u64"
+              },
+              "required": true
+            },
+            {
+              "name": "username",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "email",
+              "type": {
+                "name": "std::string::String"
+              },
+              "required": true
+            },
+            {
+              "name": "created_at",
+              "type": {
+                "name": "chrono::DateTime",
+                "arguments": [
+                  {
+                    "name": "chrono::Utc"
+                  }
+                ]
+              },
+              "required": true
+            },
+            {
+              "name": "roles",
+              "type": {
+                "name": "std::vec::Vec",
+                "arguments": [
+                  {
+                    "name": "shared_models::Role"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "status",
+              "type": {
+                "name": "shared_models::AccountStatus"
+              },
+              "required": true
+            },
+            {
+              "name": "active",
+              "type": {
+                "name": "bool"
+              },
+              "required": true
+            },
+            {
+              "name": "preferences",
+              "type": {
+                "name": "std::option::Option",
+                "arguments": [
+                  {
+                    "name": "shared_models::Preferences"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "kind": "enum",
+        "name": "std::option::Option",
+        "description": "Optional nullable type",
+        "parameters": [
+          {
+            "name": "T"
+          }
+        ],
+        "representation": "none",
+        "variants": [
+          {
+            "name": "None",
+            "description": "The value is not provided, i.e. null",
+            "fields": "none"
+          },
+          {
+            "name": "Some",
+            "description": "The value is provided and set to some value",
+            "fields": {
+              "unnamed": [
+                {
+                  "name": "0",
+                  "type": {
+                    "name": "T"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "kind": "primitive",
+        "name": "std::string::String",
+        "description": "UTF-8 encoded string"
+      },
+      {
+        "kind": "primitive",
+        "name": "std::vec::Vec",
+        "description": "Expandable array type",
+        "parameters": [
+          {
+            "name": "T"
+          }
+        ]
+      },
+      {
+        "kind": "primitive",
+        "name": "u64",
+        "description": "64-bit unsigned integer"
+      }
+    ]
+  }
+}
